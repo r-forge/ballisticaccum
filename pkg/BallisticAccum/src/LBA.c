@@ -28,11 +28,16 @@ int compare_doubles (const void *a, const void *b);
 double expXPhiA(double x,double a);
 double logPhiAminusPhiB(double a, double b);
 double expXphiAminusphiB(double x, double a, double b, int returnlog);
-double sampleTruncRT(double rtcut, double muD, double sig2D, double bThresh, double t0, double start, double sigMet, int *acc);
-double sampleMuD(double *allRTp, int j, double sig2D, double bThresh, double mu0, double sig20, int Ntrials, int NrespC, double start, double sigMet, int *acc);
-double samplesig2D(double *allRTp, int j, double *muD, double bThresh, double a0C, double b0C, int NtrialsC, int NrespC, double start, double sigMet,int *acc);
-double sampleBthresh(double *allRTp, int j,double *muD, double sig2D, double muBC, double sig2BC,int NtrialsC, int NrespC, double start, double sigMet,int *acc);
-double samplet0(double *allRTp, double *muD, double sig2D,double bThresh, int NtrialsC, int NrespC, double start, double sigMet, int *acc);
+double samplet0(double *allRT, double *muD, double sig2D, double bThresh, int Ntrials, int Nresp, double minRT, double start, double sigMet, int *acc);
+double sampleBthresh(double *allRT, double *muD, double sig2D, double t0, double muB, double sig2B,int Ntrials, int Nresp, double start, double sigMet,int *acc);
+double samplesig2D(double *allRT, double *muD, double bThresh, double t0, double a0, double b0, int Ntrials, int Nresp, double start, double sigMet, int *acc);
+double sampleMuD(double *allRT, int j, double sig2D, double bThresh, double t0, double mu0, double sig20, int Ntrials, double start, double sigMet, int *acc);
+double sampleTruncRT(double rtcut, double muD, double sig2D, double bThresh, double t0, double start, double sigMet, int *acc, double *like);
+double logCondPostMuD(double *allRT, double muD, int j, double sig2D, double bThresh, double t0, double mu0, double sig20, int Ntrials);
+double logCondPostB(double *allRT, double *muD, double sig2D, double bThresh, double t0, double muB, double sig2B, int Nresp, int Ntrials);
+double logCondPostsig2D(double *allRT, double *muD, double sig2D, double bThresh, double t0, double a0, double b0, int Nresp, int Ntrials);
+double logCondPostt0(double *allRT, double *muD, double sig2D, double bThresh, double t0, double minRT, int Nresp, int Ntrials);
+double logLikelihood(double tij, double muD, double sig2D, double bThresh, double t0);
 
 
 
@@ -76,14 +81,13 @@ int compare_doubles (const void *a, const void *b)
 }
 
 double expXPhiA(double x,double a){
-  double ret;
+  double ret=0;
   switch(a<-5){
   case 1:
     ret=exp(x-pow(a,2)/2-log(-a)-.94/pow(a,2)-.5*log(2*M_PI));
     break;
   case 0:
-     Rprintf("\n****Tried to use approximation inappropriately. x=%f, a=%f\n\n",x,a);
-     exit(1);
+    Rprintf("\n****Tried to use approximation inappropriately. x=%f, a=%f\n\n",x,a);
     break;
   } 
   return(ret);
@@ -96,7 +100,6 @@ double logPhiAminusPhiB(double a, double b){
   double da=0,db=0,ta,tb,fa,fb,g,lza,lzb;
   if(a<0||b<0){     
     Rprintf("\n****Tried to use approximation inappropriately. a=%f, b=%f\n\n",a,b);
-    exit(1);
   }
   ta=1/(1+c0*a);
   tb=1/(1+c0*b);  
@@ -121,11 +124,11 @@ double expXphiAminusphiB(double x, double a, double b, int returnlog){
     }else if(a<-5&&b<-5){
       ret=x+logPhiAminusPhiB(-b,-a);
     }else{
-      ret=x+log(pnorm(a,0,1,0,1)-pnorm(b,0,1,0,1));
+      ret=x+log(pnorm(a,0,1,1,0)-pnorm(b,0,1,1,0));
     }
     break;
   default:
-    ret=x+log(pnorm(a,0,1,0,1)-pnorm(b,0,1,0,1));
+    ret=x+log(pnorm(a,0,1,1,0)-pnorm(b,0,1,1,0));
     break;
   }
   if(!returnlog){
@@ -144,8 +147,8 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	int NrespC=0, NtrialsC=0, *respC, NitersC=0,i=0,j=0,m=0,accT=0,accB=0,accMuD=0,accsig2D=0,acct0=0;
 	double *rtC, muBC=0, sig2BC=0, mu0C=0, sig20C=0, a0C=0, b0C=0,minRT=DBL_MAX;
 	double bThresh=0, sig2D=0,t0=0,*allRTp,*chainsp, *accRatesp;
-	double sigMetTC=0, sigMetBC=0, sigMett0C=0, sigMetMuDC=0, sigMetsig2DC=0;
-	SEXP allRT, chains, returnList, accRates;
+	double sigMetTC=0, sigMetBC=0, sigMett0C=0, sigMetMuDC=0, sigMetsig2DC=0, *likeTotalp, likeSingle=0;
+	SEXP allRT, chains, returnList, accRates, likeTotal;
 
 
 	NrespC = INTEGER_VALUE(Nresp);
@@ -169,18 +172,28 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	
 	PROTECT(chains = allocMatrix(REALSXP, NitersC, 3 + NrespC));
 	PROTECT(allRT = alloc3Darray(REALSXP,NtrialsC,NrespC,NitersC));
-	PROTECT(returnList = allocVector(VECSXP, 3));
+	PROTECT(returnList = allocVector(VECSXP, 4));
 	PROTECT(accRates = allocVector(REALSXP,5)); 
+	PROTECT(likeTotal = allocVector(REALSXP,NitersC-1));
 	
 	allRTp = REAL(allRT);
 	chainsp = REAL(chains);
 	accRatesp = REAL(accRates);
+	likeTotalp = REAL(likeTotal);
 	
+	GetRNGstate();
 	
 	/* Initialize Starting Values */
 	for(j=0;j<NrespC;j++){
 		muD[j] = 1;
 		chainsp[j*NitersC] = muD[j];
+		for(i=0;i<NtrialsC;i++){
+			if(j==(respC[i]-1)){
+				allRTp[j*NtrialsC + i] = rtC[i];
+			}else{
+				allRTp[j*NtrialsC + i] = rtC[i]*1.3;
+			}
+		}
 	}
 	
 	for(i=0;i<NtrialsC;i++){
@@ -194,31 +207,32 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	chainsp[(NrespC + 0)*NitersC] = sig2D;
 	chainsp[(NrespC + 1)*NitersC] = bThresh;
 	chainsp[(NrespC + 2)*NitersC] = t0;
-
 	
 	/* Start MCMC chain */
 	for(m=1;m<NitersC;m++){
 			
 			/* Sample RTs */
+			likeTotalp[m-1]=0;
 			for(i=0;i<NtrialsC;i++){
 				for(j=0;j<NrespC;j++){
 					if((respC[i]-1)==j){
 						allRTp[m*(NrespC*NtrialsC) + j*NtrialsC + i] = rtC[i];
 					}else{
-					  allRTp[m*(NrespC*NtrialsC) + j*NtrialsC + i] = sampleTruncRT(rtC[i],muD[j],sig2D,bThresh,t0,allRTp[m*(NrespC*NtrialsC) + j*NtrialsC + i],sigMetTC,&accT);
+					  allRTp[m*(NrespC*NtrialsC) + j*NtrialsC + i] = sampleTruncRT(rtC[i],muD[j],sig2D,bThresh,t0,allRTp[(m-1)*(NrespC*NtrialsC) + j*NtrialsC + i],sigMetTC,&accT,&likeSingle);
+					  likeTotalp[m-1] += likeSingle;
 					}
 				}
 			}
 			
 			/*  Sample  muD[j] */
 			for(j=0;j<NrespC;j++){
-			  muD[j] = sampleMuD(allRTp,j,sig2D,bThresh,mu0C,sig20C,NtrialsC,NrespC,muD[j],sigMetMuDC,&accMuD);
+				//muD[j] = sampleMuD(allRTp,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
 				chainsp[j*NitersC + m] = muD[j];
 			}
 			
-			sig2D = samplesig2D(allRTp,j,muD,bThresh,a0C,b0C,NtrialsC,NrespC,sig2D,sigMetsig2DC,&accsig2D);
-			bThresh = sampleBthresh(allRTp,j,muD,sig2D,muBC,sig2BC,NtrialsC,NrespC,bThresh,sigMetBC,&accB);
-			t0 = samplet0(allRTp,muD,sig2D,bThresh,NtrialsC,NrespC,bThresh,sigMett0C,&acct0);
+			//sig2D = samplesig2D(allRTp,muD,bThresh,t0,a0C,b0C,NtrialsC,NrespC,sig2D,sigMetsig2DC,&accsig2D);
+			//bThresh = sampleBthresh(allRTp,muD,sig2D,t0,muBC,sig2BC,NtrialsC,NrespC,bThresh,sigMetBC,&accB);
+			//t0 = samplet0(allRTp,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
 		
 			chainsp[(NrespC + 0)*NitersC + m] = sig2D;
 			chainsp[(NrespC + 1)*NitersC + m] = bThresh;
@@ -226,18 +240,21 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 		
 	}
 	
-	accRatesp[0] = accT/((NrespC-1)*NitersC*NtrialsC);
-	accRatesp[1] = accMuD/NitersC;
-	accRatesp[2] = accsig2D/NitersC;
-	accRatesp[3] = accB/NitersC;
-	accRatesp[4] = acct0/NitersC;
+	accRatesp[0] = (double)(accT)/((NrespC-1)*NitersC*NtrialsC);
+	accRatesp[1] = (double)(accMuD)/NitersC;
+	accRatesp[2] = (double)(accsig2D)/NitersC;
+	accRatesp[3] = (double)(accB)/NitersC;
+	accRatesp[4] = (double)(acct0)/NitersC;
 			
 	
 	SET_VECTOR_ELT(returnList, 0, chains);
 	SET_VECTOR_ELT(returnList, 1, allRT);
 	SET_VECTOR_ELT(returnList, 2, accRates);
+	SET_VECTOR_ELT(returnList, 3, likeTotal);
 	
-	UNPROTECT(4);
+	UNPROTECT(5);
+	
+	PutRNGstate();
 	
 	return(returnList);
 	
@@ -248,17 +265,16 @@ double logLikelihood(double tij, double muD, double sig2D, double bThresh, doubl
 	double ans=0,a=0,b=0;
 	
 	if(bThresh<=0){
-		ans = log(pnorm((muD-log(tij-t0)-sig2D)/sqrt(sig2D),0,1,0,1));
+		ans = log(pnorm((muD-log(tij-t0)-sig2D)/sqrt(sig2D),0,1,1,0));
 	}else{
 		a = (log(tij-t0) - log(bThresh - 1) - muD + sig2D)/sqrt(sig2D);
 		b = (log(tij-t0) - log(bThresh) - muD + sig2D)/sqrt(sig2D);
 	    ans  = expXphiAminusphiB(0.0, a, b, 1);	
 	}
-	
 	return(ans);
 }
 
-double logCondPostt0(double *allRT, double *muD, double sig2D, double bThresh, double t0, double minRT, int Nresp, int Ntrials);
+double logCondPostt0(double *allRT, double *muD, double sig2D, double bThresh, double t0, double minRT, int Nresp, int Ntrials)
 {
 	double ans=-DBL_MAX;
 	int i=0,j=0;
@@ -273,7 +289,7 @@ double logCondPostt0(double *allRT, double *muD, double sig2D, double bThresh, d
 	return(ans);
 }
 
-double logCondPostsig2D(double *allRT, double *muD, double sig2D, double bThresh, double t0, double a0, double b0, int Nresp, int Ntrials);
+double logCondPostsig2D(double *allRT, double *muD, double sig2D, double bThresh, double t0, double a0, double b0, int Nresp, int Ntrials)
 {
 	double ans=-DBL_MAX;
 	int i=0,j=0;
@@ -290,7 +306,7 @@ double logCondPostsig2D(double *allRT, double *muD, double sig2D, double bThresh
 	return(ans);
 }
 
-double logCondPostB(double *allRT, double *muD, double sig2D, double bThresh, double t0, double muB, double sig2B, int Nresp, int Ntrials);
+double logCondPostB(double *allRT, double *muD, double sig2D, double bThresh, double t0, double muB, double sig2B, int Nresp, int Ntrials)
 {
 	double ans=-DBL_MAX;
 	int i=0,j=0;
@@ -308,28 +324,115 @@ double logCondPostB(double *allRT, double *muD, double sig2D, double bThresh, do
 	return(ans);
 }
 
-double sampleTruncRT(double rtcut, double muD, double sig2D, double bThresh, double t0, double start, double sigMet, int *acc)
+
+double logCondPostMuD(double *allRT, double muD, int j, double sig2D, double bThresh, double t0, double mu0, double sig20, int Ntrials)
 {
-	double rt = rtcut + 2;
-	return(rt);
+	double ans=0;
+	int i=0;
+	
+	for(i=0;i<Ntrials;i++){
+			ans += logLikelihood(allRT[j*Ntrials + i], muD, sig2D, bThresh, t0);
+	}
+	
+	ans += -Ntrials*muD - 0.5/sig20*pow(muD - mu0,2);
+	return(ans);
 }
 
-double sampleMuD(double *allRTp, int j, double sig2D, double bThresh, double mu0, double sig20, int Ntrials, int NrespC, double start, double sigMet, int *acc)
+double sampleTruncRT(double rtcut, double muD, double sig2D, double bThresh, double t0, double start, double sigMet, int *acc, double *like)
 {
-	return(0);
+	double cand = start + rnorm(0,sigMet);
+	double u=0;
+	double likeCand = 0, likeStart = 0;
+	if(cand<rtcut) return(start);
+	u = runif(0,1);
+	
+	likeCand = logLikelihood(cand, muD, sig2D, bThresh, t0);
+	likeStart = logLikelihood(start, muD, sig2D, bThresh, t0);
+	if(-log(u) > (likeCand - likeStart))
+		{
+			*like = likeCand - muD + sig2D/2;
+			*acc = *acc + 1;
+			return(cand);
+		}else{
+			*like = likeStart - muD + sig2D/2;
+			return(start);
+		}
 }
 
-double samplesig2D(double *allRTp, int j, double *muD, double bThresh, double a0C, double b0C, int NtrialsC, int NrespC, double start, double sigMet,int *acc)
+double sampleMuD(double *allRT, int j, double sig2D, double bThresh, double t0, double mu0, double sig20, int Ntrials, double start, double sigMet, int *acc)
 {
-	return(0);
+	double cand = start + rnorm(0,sigMet);
+	double u=0;
+	double likeCand = 0, likeStart = 0;
+
+	u = runif(0,1);
+	
+	likeCand = logCondPostMuD(allRT, cand, j, sig2D, bThresh, t0, mu0, sig20, Ntrials);
+	likeStart = logCondPostMuD(allRT, start, j, sig2D, bThresh, t0, mu0, sig20, Ntrials);
+	if(-log(u) > (likeCand - likeStart))
+		{
+			*acc = *acc + 1;
+			return(cand);
+		}else{
+			return(start);
+		}
 }
 
-double sampleBthresh(double *allRTp, int j,double *muD, double sig2D, double muBC, double sig2BC,int NtrialsC, int NrespC, double start, double sigMet,int *acc)
+double samplesig2D(double *allRT, double *muD, double bThresh, double t0, double a0, double b0, int Ntrials, int Nresp, double start, double sigMet, int *acc)
 {
-	return(0);
+	double cand = start + rnorm(0,sigMet);
+	double u=0;
+	double likeCand = 0, likeStart = 0;
+	if(cand<0) return(start);
+	u = runif(0,1);
+	
+	likeCand = logCondPostsig2D(allRT, muD, cand, bThresh, t0, a0, b0, Nresp, Ntrials);
+	likeStart = logCondPostsig2D(allRT, muD, start, bThresh, t0, a0, b0, Nresp, Ntrials);
+	if(-log(u) > (likeCand - likeStart))
+		{
+			*acc = *acc + 1;
+			return(cand);
+		}else{
+			return(start);
+		}	
 }
 
-double samplet0(double *allRTp, double *muD, double sig2D,double bThresh, int NtrialsC, int NrespC, double start, double sigMet, int *acc)
+double sampleBthresh(double *allRT, double *muD, double sig2D, double t0, double muB, double sig2B,int Ntrials, int Nresp, double start, double sigMet,int *acc)
 {
-	return(0);
+	double cand = start + rnorm(0,sigMet);
+	double u=0;
+	double likeCand = 0, likeStart = 0;
+	if(cand<0) return(start);
+	u = runif(0,1);
+	
+	likeCand = logCondPostB(allRT, muD, sig2D, cand, t0, muB, sig2B, Nresp, Ntrials);
+	likeStart = logCondPostB(allRT, muD, sig2D, start, t0, muB, sig2B, Nresp, Ntrials);
+	if(-log(u) > (likeCand - likeStart))
+		{
+			*acc = *acc + 1;
+			return(cand);
+		}else{
+			return(start);
+		}	
 }
+
+double samplet0(double *allRT, double *muD, double sig2D, double bThresh, int Ntrials, int Nresp, double minRT, double start, double sigMet, int *acc)
+{
+	double cand = start + rnorm(0,sigMet);
+	double u=0;
+	double likeCand = 0, likeStart = 0;
+	if(cand<0 || cand>minRT) return(start);
+	u = runif(0,1);
+	
+	likeCand = logCondPostt0(allRT, muD, sig2D, bThresh, cand, minRT, Nresp, Ntrials);
+	likeStart = logCondPostt0(allRT, muD, sig2D, bThresh, start, minRT, Nresp, Ntrials);
+	if(-log(u) > (likeCand - likeStart))
+		{
+			*acc = *acc + 1;
+			return(cand);
+		}else{
+			return(start);
+		}	
+}
+
+
