@@ -232,7 +232,7 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 			
 			//sig2D = samplesig2D(allRTp,muD,bThresh,t0,a0C,b0C,NtrialsC,NrespC,sig2D,sigMetsig2DC,&accsig2D);
 			//bThresh = sampleBthresh(allRTp,muD,sig2D,t0,muBC,sig2BC,NtrialsC,NrespC,bThresh,sigMetBC,&accB);
-			//t0 = samplet0(allRTp,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
+			t0 = samplet0(allRTp,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
 		
 			chainsp[(NrespC + 0)*NitersC + m] = sig2D;
 			chainsp[(NrespC + 1)*NitersC + m] = bThresh;
