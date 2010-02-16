@@ -348,7 +348,7 @@ double sampleTruncRT(double rtcut, double muD, double sig2D, double bThresh, dou
 	
 	likeCand = logLikelihood(cand, muD, sig2D, bThresh, t0);
 	likeStart = logLikelihood(start, muD, sig2D, bThresh, t0);
-	if(-log(u) > (likeCand - likeStart))
+	if(log(u) < (likeCand - likeStart))
 		{
 			*like = likeCand - muD + sig2D/2;
 			*acc = *acc + 1;
@@ -369,7 +369,7 @@ double sampleMuD(double *allRT, int j, double sig2D, double bThresh, double t0, 
 	
 	likeCand = logCondPostMuD(allRT, cand, j, sig2D, bThresh, t0, mu0, sig20, Ntrials);
 	likeStart = logCondPostMuD(allRT, start, j, sig2D, bThresh, t0, mu0, sig20, Ntrials);
-	if(-log(u) > (likeCand - likeStart))
+	if(log(u) < (likeCand - likeStart))
 		{
 			*acc = *acc + 1;
 			return(cand);
@@ -388,7 +388,7 @@ double samplesig2D(double *allRT, double *muD, double bThresh, double t0, double
 	
 	likeCand = logCondPostsig2D(allRT, muD, cand, bThresh, t0, a0, b0, Nresp, Ntrials);
 	likeStart = logCondPostsig2D(allRT, muD, start, bThresh, t0, a0, b0, Nresp, Ntrials);
-	if(-log(u) > (likeCand - likeStart))
+	if(log(u) < (likeCand - likeStart))
 		{
 			*acc = *acc + 1;
 			return(cand);
@@ -407,7 +407,7 @@ double sampleBthresh(double *allRT, double *muD, double sig2D, double t0, double
 	
 	likeCand = logCondPostB(allRT, muD, sig2D, cand, t0, muB, sig2B, Nresp, Ntrials);
 	likeStart = logCondPostB(allRT, muD, sig2D, start, t0, muB, sig2B, Nresp, Ntrials);
-	if(-log(u) > (likeCand - likeStart))
+	if(log(u) < (likeCand - likeStart))
 		{
 			*acc = *acc + 1;
 			return(cand);
@@ -426,7 +426,7 @@ double samplet0(double *allRT, double *muD, double sig2D, double bThresh, int Nt
 	
 	likeCand = logCondPostt0(allRT, muD, sig2D, bThresh, cand, minRT, Nresp, Ntrials);
 	likeStart = logCondPostt0(allRT, muD, sig2D, bThresh, start, minRT, Nresp, Ntrials);
-	if(-log(u) > (likeCand - likeStart))
+	if(log(u) < (likeCand - likeStart))
 		{
 			*acc = *acc + 1;
 			return(cand);
