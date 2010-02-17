@@ -1,4 +1,4 @@
 useDynLib(BallisticAccum)
 
-export(LBAsingle)
+export(LBAsingle,LBAlike)
 

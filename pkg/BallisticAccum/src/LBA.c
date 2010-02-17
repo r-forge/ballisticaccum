@@ -185,7 +185,7 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	
 	/* Initialize Starting Values */
 	for(j=0;j<NrespC;j++){
-		muD[j] = 1;
+		muD[j] = -1;
 		chainsp[j*NitersC] = muD[j];
 		for(i=0;i<NtrialsC;i++){
 			if(j==(respC[i]-1)){
@@ -201,7 +201,7 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	}
 	
 	bThresh = 2;
-	sig2D = 0.5;
+	sig2D = 0.1;
 	t0 = 0.95*minRT;
 
 	chainsp[(NrespC + 0)*NitersC] = sig2D;
@@ -226,13 +226,13 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 			
 			/*  Sample  muD[j] */
 			for(j=0;j<NrespC;j++){
-				//muD[j] = sampleMuD(allRTp,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
+				muD[j] = sampleMuD(allRTp,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
 				chainsp[j*NitersC + m] = muD[j];
 			}
 			
 			//sig2D = samplesig2D(allRTp,muD,bThresh,t0,a0C,b0C,NtrialsC,NrespC,sig2D,sigMetsig2DC,&accsig2D);
 			//bThresh = sampleBthresh(allRTp,muD,sig2D,t0,muBC,sig2BC,NtrialsC,NrespC,bThresh,sigMetBC,&accB);
-			t0 = samplet0(allRTp,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
+			//t0 = samplet0(allRTp,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
 		
 			chainsp[(NrespC + 0)*NitersC + m] = sig2D;
 			chainsp[(NrespC + 1)*NitersC + m] = bThresh;
@@ -241,7 +241,7 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	}
 	
 	accRatesp[0] = (double)(accT)/((NrespC-1)*NitersC*NtrialsC);
-	accRatesp[1] = (double)(accMuD)/NitersC;
+	accRatesp[1] = (double)(accMuD)/(NrespC*NitersC);
 	accRatesp[2] = (double)(accsig2D)/NitersC;
 	accRatesp[3] = (double)(accB)/NitersC;
 	accRatesp[4] = (double)(acct0)/NitersC;
@@ -259,6 +259,34 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	return(returnList);
 	
 }
+
+SEXP RlogLikelihood(SEXP tijR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R)
+{
+	double a=0,b=0;
+	double tij = REAL(tijR)[0];
+	double muD = REAL(muDR)[0];
+	double sig2D = REAL(sig2DR)[0];
+	double bThresh = REAL(bThreshR)[0];
+	double t0 = REAL(t0R)[0];
+	SEXP ansR;
+	
+	PROTECT(ansR = allocVector(REALSXP, 1));
+	double *ans = REAL(ansR);
+	
+	if(bThresh<=0){
+		ans[0] = log(pnorm((muD-log(tij-t0)-sig2D)/sqrt(sig2D),0,1,1,0));
+	}else{
+		a = (log(tij-t0) - log(bThresh - 1) - muD + sig2D)/sqrt(sig2D);
+		b = (log(tij-t0) - log(bThresh) - muD + sig2D)/sqrt(sig2D);
+	    ans[0]  = expXphiAminusphiB(0.0, a, b, 1);	
+	}
+	ans[0] += -muD + sig2D/2;
+
+	UNPROTECT(1);
+	
+	return(ansR);
+}
+
 
 double logLikelihood(double tij, double muD, double sig2D, double bThresh, double t0)
 {
@@ -340,7 +368,8 @@ double logCondPostMuD(double *allRT, double muD, int j, double sig2D, double bTh
 
 double sampleTruncRT(double rtcut, double muD, double sig2D, double bThresh, double t0, double start, double sigMet, int *acc, double *like)
 {
-	double cand = start + rnorm(0,sigMet);
+	//double cand = rexp(1)*sigMet+rtcut;
+	double cand = rnorm(0,sigMet) + start;
 	double u=0;
 	double likeCand = 0, likeStart = 0;
 	if(cand<rtcut) return(start);
@@ -421,8 +450,10 @@ double samplet0(double *allRT, double *muD, double sig2D, double bThresh, int Nt
 	double cand = start + rnorm(0,sigMet);
 	double u=0;
 	double likeCand = 0, likeStart = 0;
+	
 	if(cand<0 || cand>minRT) return(start);
 	u = runif(0,1);
+	
 	
 	likeCand = logCondPostt0(allRT, muD, sig2D, bThresh, cand, minRT, Nresp, Ntrials);
 	likeStart = logCondPostt0(allRT, muD, sig2D, bThresh, start, minRT, Nresp, Ntrials);
