@@ -8,3 +8,10 @@ LBAlike = function(rt,muD=-1,sig2D=1,bThresh=2,t0=1)
   {
     .Call("RlogLikelihood",rt, muD, sig2D, bThresh, t0, package="BallisticAccum")
   }
+
+LBAlikeMu = function(mu,rt,j,sig2,bThresh,t0,mu0,sig20)
+{
+  .Call("RlogCondPostMuD",rt,mu,as.integer(j),sig2,bThresh,t0,mu0,sig20,as.integer(dim(rt)[1]),package="BallisticAccum")
+}
+
+

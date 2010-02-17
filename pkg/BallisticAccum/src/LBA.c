@@ -39,7 +39,9 @@ double logCondPostsig2D(double *allRT, double *muD, double sig2D, double bThresh
 double logCondPostt0(double *allRT, double *muD, double sig2D, double bThresh, double t0, double minRT, int Nresp, int Ntrials);
 double logLikelihood(double tij, double muD, double sig2D, double bThresh, double t0);
 
+SEXP RlogCondPostMuD(SEXP allRTR, SEXP muDR, SEXP jR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP mu0R, SEXP sig20R, SEXP NtrialsR);
 
+SEXP RlogLikelihood(SEXP tijR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R);
 
 /**
  * Allocate a 3-dimensional array
@@ -226,7 +228,7 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 			
 			/*  Sample  muD[j] */
 			for(j=0;j<NrespC;j++){
-				muD[j] = sampleMuD(allRTp,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
+			  //muD[j] = sampleMuD(allRTp,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
 				chainsp[j*NitersC + m] = muD[j];
 			}
 			
@@ -285,6 +287,36 @@ SEXP RlogLikelihood(SEXP tijR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R)
 	UNPROTECT(1);
 	
 	return(ansR);
+}
+
+
+
+SEXP RlogCondPostMuD(SEXP allRTR, SEXP muDR, SEXP jR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP mu0R, SEXP sig20R, SEXP NtrialsR)
+{
+  double *ans;
+  int i=0;
+  double *allRT, muD, sig2D, bThresh, t0, mu0, sig20;
+  int j,Ntrials;
+  SEXP ansR;
+
+  PROTECT(ansR = allocVector(REALSXP,1));
+  ans = REAL(ansR);
+  allRT = REAL(allRTR);
+  muD = REAL(muDR)[0];
+  j = INTEGER_VALUE(jR)-1;
+  sig2D = REAL(sig2DR)[0];
+  bThresh = REAL(bThreshR)[0];
+  t0 = REAL(t0R)[0];
+  mu0 = REAL(mu0R)[0];
+  sig20 = REAL(sig20R)[0];
+  Ntrials = INTEGER_VALUE(NtrialsR);
+
+  ans[0] = logCondPostMuD(allRT, muD, j, sig2D, bThresh, t0, mu0, sig20, Ntrials);
+
+
+  UNPROTECT(1);
+
+  return(ansR);
 }
 
 
@@ -360,6 +392,7 @@ double logCondPostMuD(double *allRT, double muD, int j, double sig2D, double bTh
 	
 	for(i=0;i<Ntrials;i++){
 			ans += logLikelihood(allRT[j*Ntrials + i], muD, sig2D, bThresh, t0);
+			//Rprintf("i:%d j:%d t:%f\n",i,j,allRT[j*Ntrials + i]);
 	}
 	
 	ans += -Ntrials*muD - 0.5/sig20*pow(muD - mu0,2);
