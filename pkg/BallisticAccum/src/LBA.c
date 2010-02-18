@@ -40,8 +40,8 @@ double logCondPostt0(double *allRT, double *muD, double sig2D, double bThresh, d
 double logLikelihood(double tij, double muD, double sig2D, double bThresh, double t0);
 
 SEXP RlogCondPostMuD(SEXP allRTR, SEXP muDR, SEXP jR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP mu0R, SEXP sig20R, SEXP NtrialsR);
-
 SEXP RlogLikelihood(SEXP tijR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R);
+SEXP RsampleTruncRT(SEXP cutR, SEXP startR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP sigMetR);
 
 /**
  * Allocate a 3-dimensional array
@@ -289,6 +289,32 @@ SEXP RlogLikelihood(SEXP tijR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R)
 	return(ansR);
 }
 
+SEXP RsampleTruncRT(SEXP cutR, SEXP startR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP sigMetR)
+{
+  double a=0,b=0;
+  double cut = REAL(cutR)[0];
+  double muD = REAL(muDR)[0];
+  double sig2D = REAL(sig2DR)[0];
+  double bThresh = REAL(bThreshR)[0];
+  double t0 = REAL(t0R)[0];
+  double start = REAL(startR)[0];
+  double sigMet = REAL(sigMetR)[0];
+  double temp=0;
+  int acc=0;
+
+  SEXP ansR;
+
+  PROTECT(ansR = allocVector(REALSXP, 1));
+  double *ans = REAL(ansR);
+
+  GetRNGstate();
+  ans[0] = sampleTruncRT(cut, muD, sig2D, bThresh, t0, start, sigMet, &acc, &temp);
+  PutRNGstate();
+
+  UNPROTECT(1);
+
+  return(ansR);
+}
 
 
 SEXP RlogCondPostMuD(SEXP allRTR, SEXP muDR, SEXP jR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP mu0R, SEXP sig20R, SEXP NtrialsR)

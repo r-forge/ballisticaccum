@@ -14,4 +14,11 @@ LBAlikeMu = function(mu,rt,j,sig2,bThresh,t0,mu0,sig20)
   .Call("RlogCondPostMuD",rt,mu,as.integer(j),sig2,bThresh,t0,mu0,sig20,as.integer(dim(rt)[1]),package="BallisticAccum")
 }
 
+LBAsampleTruncRT = function(cut,start,mu,sig2,bThresh,t0,sigMet=.5)
+  {
+      .Call("RsampleTruncRT",cut,start,mu,sig2,bThresh,t0,sigMet,package="BallisticAccum")
+    }
+
+
+
 
