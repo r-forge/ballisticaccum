@@ -151,8 +151,8 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	double bThresh=0, sig2D=0,t0=0,*allRTp,*chainsp, *accRatesp;
 	double sigMetTC=0, sigMetBC=0, sigMett0C=0, sigMetMuDC=0, sigMetsig2DC=0, *likeTotalp, likeSingle=0;
 	SEXP allRT, chains, returnList, accRates, likeTotal;
-
-
+	
+		
 	NrespC = INTEGER_VALUE(Nresp);
 	NtrialsC = INTEGER_VALUE(Ntrials);
 	NitersC = INTEGER_VALUE(Niters);
@@ -204,8 +204,8 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	
 	bThresh = 2;
 	sig2D = 0.1;
-	t0 = 0.95*minRT;
-
+	t0 = 2;//0.95*minRT;
+	
 	chainsp[(NrespC + 0)*NitersC] = sig2D;
 	chainsp[(NrespC + 1)*NitersC] = bThresh;
 	chainsp[(NrespC + 2)*NitersC] = t0;
@@ -214,6 +214,7 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	for(m=1;m<NitersC;m++){
 			
 			/* Sample RTs */
+			
 			likeTotalp[m-1]=0;
 			for(i=0;i<NtrialsC;i++){
 				for(j=0;j<NrespC;j++){
@@ -226,21 +227,25 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 				}
 			}
 			
+			
+			
+			
 			/*  Sample  muD[j] */
 			for(j=0;j<NrespC;j++){
-			  //muD[j] = sampleMuD(allRTp,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
+				muD[j] = sampleMuD(allRTp+m*NrespC*NtrialsC,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
 				chainsp[j*NitersC + m] = muD[j];
 			}
 			
-			//sig2D = samplesig2D(allRTp,muD,bThresh,t0,a0C,b0C,NtrialsC,NrespC,sig2D,sigMetsig2DC,&accsig2D);
-			//bThresh = sampleBthresh(allRTp,muD,sig2D,t0,muBC,sig2BC,NtrialsC,NrespC,bThresh,sigMetBC,&accB);
-			//t0 = samplet0(allRTp,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
+			sig2D = samplesig2D(allRTp+m*NrespC*NtrialsC,muD,bThresh,t0,a0C,b0C,NtrialsC,NrespC,sig2D,sigMetsig2DC,&accsig2D);
+			//bThresh = sampleBthresh(allRTp+m*NrespC*NtrialsC,muD,sig2D,t0,muBC,sig2BC,NtrialsC,NrespC,bThresh,sigMetBC,&accB);
+			t0 = samplet0(allRTp+m*NrespC*NtrialsC,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
 		
 			chainsp[(NrespC + 0)*NitersC + m] = sig2D;
 			chainsp[(NrespC + 1)*NitersC + m] = bThresh;
 			chainsp[(NrespC + 2)*NitersC + m] = t0;
 		
 	}
+	
 	
 	accRatesp[0] = (double)(accT)/((NrespC-1)*NitersC*NtrialsC);
 	accRatesp[1] = (double)(accMuD)/(NrespC*NitersC);
@@ -254,8 +259,11 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 	SET_VECTOR_ELT(returnList, 2, accRates);
 	SET_VECTOR_ELT(returnList, 3, likeTotal);
 	
+	
+	
 	UNPROTECT(5);
 	
+
 	PutRNGstate();
 	
 	return(returnList);
@@ -291,7 +299,6 @@ SEXP RlogLikelihood(SEXP tijR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R)
 
 SEXP RsampleTruncRT(SEXP cutR, SEXP startR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP sigMetR)
 {
-  double a=0,b=0;
   double cut = REAL(cutR)[0];
   double muD = REAL(muDR)[0];
   double sig2D = REAL(sig2DR)[0];
@@ -320,7 +327,6 @@ SEXP RsampleTruncRT(SEXP cutR, SEXP startR, SEXP muDR, SEXP sig2DR, SEXP bThresh
 SEXP RlogCondPostMuD(SEXP allRTR, SEXP muDR, SEXP jR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP mu0R, SEXP sig20R, SEXP NtrialsR)
 {
   double *ans;
-  int i=0;
   double *allRT, muD, sig2D, bThresh, t0, mu0, sig20;
   int j,Ntrials;
   SEXP ansR;
