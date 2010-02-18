@@ -232,13 +232,13 @@ SEXP LBAsingleC(SEXP rt, SEXP resp, SEXP Nresp, SEXP Ntrials, SEXP muB, SEXP sig
 			
 			/*  Sample  muD[j] */
 			for(j=0;j<NrespC;j++){
-				muD[j] = sampleMuD(allRTp+m*NrespC*NtrialsC,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
+				//muD[j] = sampleMuD(allRTp+m*NrespC*NtrialsC,j,sig2D,bThresh,t0,mu0C,sig20C,NtrialsC,muD[j],sigMetMuDC,&accMuD);
 				chainsp[j*NitersC + m] = muD[j];
 			}
 			
 			sig2D = samplesig2D(allRTp+m*NrespC*NtrialsC,muD,bThresh,t0,a0C,b0C,NtrialsC,NrespC,sig2D,sigMetsig2DC,&accsig2D);
-			//bThresh = sampleBthresh(allRTp+m*NrespC*NtrialsC,muD,sig2D,t0,muBC,sig2BC,NtrialsC,NrespC,bThresh,sigMetBC,&accB);
-			t0 = samplet0(allRTp+m*NrespC*NtrialsC,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
+			bThresh = sampleBthresh(allRTp+m*NrespC*NtrialsC,muD,sig2D,t0,muBC,sig2BC,NtrialsC,NrespC,bThresh,sigMetBC,&accB);
+			//t0 = samplet0(allRTp+m*NrespC*NtrialsC,muD,sig2D,bThresh,NtrialsC,NrespC,minRT,t0,sigMett0C,&acct0);
 		
 			chainsp[(NrespC + 0)*NitersC + m] = sig2D;
 			chainsp[(NrespC + 1)*NitersC + m] = bThresh;
