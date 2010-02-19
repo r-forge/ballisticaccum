@@ -20,5 +20,9 @@ LBAsampleTruncRT = function(cut,start,mu,sig2,bThresh,t0,sigMet=.5)
     }
 
 
+LBAfullLike = function(rt,muD=-1,sig2D=.01,bThresh=2,t0=2)
+  {
+    .Call("RfullLogLikelihood",rt, muD, sig2D, bThresh, t0, as.integer(dim(rt)[1]), as.integer(dim(rt)[2]), package="BallisticAccum")
+  }
 
 

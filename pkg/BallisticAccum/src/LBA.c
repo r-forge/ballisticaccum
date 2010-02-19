@@ -42,6 +42,7 @@ double logLikelihood(double tij, double muD, double sig2D, double bThresh, doubl
 SEXP RlogCondPostMuD(SEXP allRTR, SEXP muDR, SEXP jR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP mu0R, SEXP sig20R, SEXP NtrialsR);
 SEXP RlogLikelihood(SEXP tijR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R);
 SEXP RsampleTruncRT(SEXP cutR, SEXP startR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP sigMetR);
+SEXP RfullLogLikelihood(SEXP allRTsR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP NtrialsR, SEXP NrespR);
 
 /**
  * Allocate a 3-dimensional array
@@ -292,6 +293,38 @@ SEXP RlogLikelihood(SEXP tijR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R)
 	}
 	ans[0] += -muD + sig2D/2;
 
+	UNPROTECT(1);
+	
+	return(ansR);
+}
+
+SEXP RfullLogLikelihood(SEXP allRTsR, SEXP muDR, SEXP sig2DR, SEXP bThreshR, SEXP t0R, SEXP NtrialsR, SEXP NrespR)
+{
+	int i,j;
+	double *allRTs = REAL(allRTsR);
+	double *muD = REAL(muDR);
+	double sig2D = REAL(sig2DR)[0];
+	double bThresh = REAL(bThreshR)[0];
+	double t0 = REAL(t0R)[0];
+	int Ntrials = INTEGER_VALUE(NtrialsR);
+	int Nresp = INTEGER_VALUE(NrespR);
+	SEXP ansR;
+	double sumMu=0;
+	
+	PROTECT(ansR = allocVector(REALSXP, 1));
+	double *ans = REAL(ansR);
+	ans[0]=0;
+	
+	for(j=0;j<Nresp;j++)
+		sumMu+=muD[j];
+	
+	for(i=0;i<Ntrials;i++){
+		for(j=0;j<Nresp;j++){
+			ans[0] += logLikelihood(allRTs[j*Ntrials + i], muD[j], sig2D, bThresh, t0);
+		}
+	}
+	ans[0] = ans[0] - Ntrials*sumMu + Ntrials*Nresp*sig2D/2;
+	
 	UNPROTECT(1);
 	
 	return(ansR);
